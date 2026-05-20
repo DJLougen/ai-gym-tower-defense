@@ -16,6 +16,16 @@ Train RL agents, pit heuristic bots against each other, or play by hand — all 
 
 ---
 
+## Demo
+
+| PPO Agent (trained 50K steps) | Greedy Baseline |
+|:---:|:---:|
+| ![PPO Demo](media/ppo_demo.gif) | ![Greedy Demo](media/greedy_demo.gif) |
+| **Wave 7**, 20 lives, reward +7.8 | **Wave 4**, 0 lives, reward -23.4 |
+
+The PPO agent learns to place towers strategically along the enemy path, significantly outperforming the greedy baseline which places towers haphazardly.
+
+
 ## Why?
 
 Tower defense is a surprisingly rich sandbox for AI research:

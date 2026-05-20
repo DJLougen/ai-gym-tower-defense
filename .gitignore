@@ -28,16 +28,16 @@ ENV/
 .coverage
 htmlcov/
 
-# Training artifacts
+# Training artifacts (but keep committed agent.pt)
 runs/
-*.pt
 *.pth
 *.onnx
 
-# Media
-*.gif
+# Media (allow committed media/, ignore stray files)
+!media/
+!media/**
+!agent.pt
 *.mp4
-*.png
 
 # OS
 .DS_Store
