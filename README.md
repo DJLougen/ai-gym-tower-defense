@@ -46,7 +46,7 @@ This package gives you a **small, fast, pure-Python engine** plus a **Gymnasium 
 - 🎨 **Optional pygame viewer** for live play.
 - 🔁 **Registered as `TowerDefense-v0`** via `gymnasium.make`.
 - 🤖 **LLM agent support** — benchmark OpenAI, Anthropic, and Google models with structured observations.
-- 📊 **Benchmark harness** — automated evaluation with win rates, costs, and latency tracking.
+- 📊 **Benchmark harness** — automated evaluation with win rates, strategic metrics, multi-map support, and cost tracking.
 
 ## Installation
 
@@ -200,13 +200,38 @@ print(f"Agent stats: {agent.get_stats()}")
 
 ### Running the Benchmark Harness
 
-The benchmark script runs multiple episodes per model and collects:
+The benchmark evaluates agents on **strategic planning and resource allocation** in a complex, long-horizon environment.
+
+#### What We Measure
+
+**Performance Metrics:**
 - **Win rate** — percentage of games won (all 20 waves cleared)
 - **Avg waves survived** — how far the agent got
 - **Avg final lives** — remaining base health
-- **Avg final gold** — resource efficiency
 - **Avg latency** — API response time per decision
 - **Total cost** — USD spent on API calls
+
+**Strategic Metrics:**
+- **Tower Efficiency** — damage dealt per gold spent (higher = better ROI)
+- **Coverage Score** — % of path cells within tower range (higher = better positioning)
+- **Build Timing** — average step when towers are placed (lower = earlier planning)
+- **Tower Diversity** — unique tower types used / total available (higher = strategic flexibility)
+- **Gold Utilization** — gold spent / total gold available (higher = active resource use)
+- **Path Control** — average towers covering each path cell (higher = redundant coverage)
+
+These metrics reveal **how** an agent plays, not just whether it wins. A model that places 3 well-positioned cannons covering 80% of the path beats a model that places 10 archers randomly, even if both lose at wave 10.
+
+#### Available Maps
+
+| Map | Description | Tests |
+|-----|-------------|-------|
+| `s_curve` | Classic S-shaped path (default) | General strategy |
+| `straight` | Simple horizontal path | Baseline performance |
+| `zigzag` | Sharp turns and vertical segments | Spatial reasoning |
+| `chokepoint` | Narrow sections with open areas | Strategic placement |
+| `spiral` | Long winding path | Long-term planning |
+
+#### Running Benchmarks
 
 ```bash
 # Set API keys
@@ -217,16 +242,23 @@ export GOOGLE_API_KEY="AI..."
 # Run benchmark on baselines (no API key needed)
 python scripts/benchmark.py --models greedy random --episodes 5
 
+# Benchmark across multiple maps
+python scripts/benchmark.py \
+    --models greedy random \
+    --maps s_curve straight zigzag chokepoint spiral \
+    --episodes 3
+
 # Benchmark frontier models
 python scripts/benchmark.py \
     --models gpt-4o claude-3-5-sonnet-20241022 gemini-1.5-pro \
-    --episodes 10 \
+    --maps s_curve zigzag chokepoint \
+    --episodes 5 \
     --max-steps 4000
 
 # Results saved to benchmark_results/benchmark_YYYYMMDD_HHMMSS.json
 ```
 
-### Example Output
+#### Example Output
 
 ```
 ================================================================================
@@ -242,6 +274,24 @@ greedy                 40.0%    14.3      7.1      98     0.00s $ 0.0000
 random                  0.0%     8.2      0.0      42     0.00s $ 0.0000
 
 ================================================================================
+
+
+====================================================================================================
+STRATEGIC PERFORMANCE METRICS
+====================================================================================================
+
+Model                 Efficiency   Coverage   Timing  Diversity   Util   Control  Towers
+----------------------------------------------------------------------------------------------------
+claude-3-5-sonnet           1.42     85.2%     12.3     75.0% 78.3%      2.14     8.2
+gpt-4o                      1.28     78.5%     15.7     62.5% 72.1%      1.85     7.1
+gemini-1.5-pro              1.15     72.3%     18.9     50.0% 68.4%      1.62     6.3
+greedy                      0.65     45.8%     25.9     50.0% 92.6%      0.37     2.5
+random                      0.00     42.3%     19.6     62.5% 96.3%      0.42     4.0
+
+====================================================================================================
+Legend: Efficiency=dmg/gold, Coverage=%path covered, Timing=avg build step,
+        Diversity=unique types, Util=gold spent, Control=avg towers/path cell
+====================================================================================================
 ```
 
 ### Custom Observations
