@@ -271,14 +271,12 @@ class AnthropicAgent(LLMAgent):
     
     def _call_llm(self, prompt: str) -> str:
         """Call Anthropic API."""
-        # Anthropic doesn't use system messages the same way
-        # Combine system prompt into user message
-        full_prompt = f"{self.system_prompt}\n\n{prompt}"
-        
+        # Use Anthropic's native system parameter for the system prompt
         response = self.client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": full_prompt}],
+            system=self.system_prompt,
+            messages=[{"role": "user", "content": prompt}],
         )
         
         # Track tokens

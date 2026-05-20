@@ -46,3 +46,7 @@ Thumbs.db
 # Misc
 *.log
 .env
+# Benchmark results (keep the directory, ignore contents)
+benchmark_results/*.json
+benchmark_results/*.md
+benchmark_results/*.png

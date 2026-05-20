@@ -136,5 +136,138 @@ def test_greedy_agent_beats_nothing():
     assert info["wave"] >= 2
 
 
+def test_obs_format_produces_valid_output():
+    """Test that format_obs_for_llm produces readable text."""
+    from ai_gym_td.env import TowerDefenseEnv
+    from ai_gym_td.obs_format import format_obs_for_llm
+
+    env = TowerDefenseEnv()
+    obs, info = env.reset(seed=42)
+    text = format_obs_for_llm(env, obs, info)
+
+    assert isinstance(text, str)
+    assert len(text) > 100
+    assert "Gold" in text
+    assert "Lives" in text
+    assert "Wave" in text
+    assert "Grid Map" in text
+    env.close()
+
+
+def test_obs_format_includes_legal_actions():
+    """Test that format_obs_for_llm lists affordable towers."""
+    from ai_gym_td.env import TowerDefenseEnv
+    from ai_gym_td.obs_format import format_obs_for_llm
+
+    env = TowerDefenseEnv()
+    obs, info = env.reset(seed=42)
+    text = format_obs_for_llm(env, obs, info)
+
+    # Should contain legal actions section
+    assert "Legal Actions" in text or "Actions" in text
+    # Starting gold is 120, archer costs 50, so archer should be affordable
+    assert "archer" in text.lower()
+    env.close()
+
+
+def test_llm_agent_parses_json_response():
+    """Test that LLMAgent._parse_response correctly extracts actions."""
+    from ai_gym_td.llm_agents import LLMAgent
+    import numpy as np
+
+    # Create a minimal LLMAgent subclass for testing
+    class TestAgent(LLMAgent):
+        def _call_llm(self, prompt):
+            return '{"action": "build", "tower_type": "archer", "x": 5, "y": 3}'
+
+    agent = TestAgent(model="test", provider="test")
+
+    # Test build action
+    action = agent._parse_response(
+        '{"action": "build", "tower_type": "archer", "x": 5, "y": 3}',
+        info={}
+    )
+    assert action.shape == (3,)
+    assert action[0] == 1  # archer is tower type 1
+    assert action[1] == 3  # y
+    assert action[2] == 5  # x
+
+    # Test pass action
+    action = agent._parse_response('{"action": "pass"}', info={})
+    assert action[0] == 0
+
+    # Test malformed JSON
+    action = agent._parse_response("I don't know what to do", info={})
+    assert action[0] == 0  # defaults to pass
+
+    # Test JSON in markdown code block
+    action = agent._parse_response(
+        '```json\n{"action": "build", "tower_type": "cannon", "x": 10, "y": 7}\n```',
+        info={}
+    )
+    assert action[0] == 2  # cannon is tower type 2
+    assert action[1] == 7  # y
+    assert action[2] == 10  # x
+
+
+def test_llm_agent_tracks_stats():
+    """Test that LLMAgent tracks tokens, cost, and latency."""
+    from ai_gym_td.llm_agents import LLMAgent
+    import time
+
+    class MockAgent(LLMAgent):
+        def _call_llm(self, prompt):
+            time.sleep(0.01)  # Simulate latency
+            self.total_tokens += 100
+            self.total_cost += 0.001
+            return '{"action": "pass"}'
+
+    agent = MockAgent(model="test", provider="test")
+
+    # Simulate a few calls
+    for _ in range(3):
+        agent.act({"grid": np.zeros((12, 20, 8)), "global": np.zeros(6), "action_mask": np.ones((5, 12, 20))}, {})
+
+    stats = agent.get_stats()
+    assert stats["total_calls"] == 3
+    assert stats["total_tokens"] == 300
+    assert stats["total_cost"] == pytest.approx(0.003, rel=1e-3)
+    assert stats["avg_latency"] > 0
+
+
+def test_llm_agent_reset_clears_history():
+    """Test that reset() clears agent history."""
+    from ai_gym_td.llm_agents import LLMAgent
+
+    class MockAgent(LLMAgent):
+        def _call_llm(self, prompt):
+            return '{"action": "pass"}'
+
+    agent = MockAgent(model="test", provider="test")
+    agent.history = [{"role": "user", "content": "test"}]
+
+    agent.reset()
+    assert agent.history == []
+
+
+def test_llm_agent_fallback_without_env():
+    """Test that LLMAgent works without env (minimal formatting)."""
+    from ai_gym_td.llm_agents import LLMAgent
+
+    class MockAgent(LLMAgent):
+        def _call_llm(self, prompt):
+            self.last_prompt = prompt
+            return '{"action": "pass"}'
+
+    agent = MockAgent(model="test", provider="test", env=None)
+
+    obs = {"grid": np.zeros((12, 20, 8)), "global": np.array([0.5, 1.0, 0.1, 1.0, 0.0, 0.0]), "action_mask": np.ones((5, 12, 20))}
+    agent.act(obs, {})
+
+    # Should have used fallback formatting
+    assert "Gold" in agent.last_prompt or "State" in agent.last_prompt
+
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
