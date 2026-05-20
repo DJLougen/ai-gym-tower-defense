@@ -250,8 +250,9 @@ def train(cfg: PPOConfig) -> TowerDefensePPOAgent:
         # GAE
         with torch.no_grad():
             b_obs = {"grid": obs_grid, "global": obs_glob}
-            next_value = agent.get_value(batch_obs([next_obs])[0])
-            next_value = next_value.to(device)
+            next_obs_batched, _ = batch_obs([next_obs])
+            next_obs_batched = {k: v.to(device) for k, v in next_obs_batched.items()}
+            next_value = agent.get_value(next_obs_batched)
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0.0
             for t in reversed(range(num_steps)):
@@ -310,7 +311,8 @@ def train(cfg: PPOConfig) -> TowerDefensePPOAgent:
                 nn.utils.clip_grad_norm_(agent.parameters(), cfg.max_grad_norm)
                 optimizer.step()
 
-        sps = int(global_step / (time.time() - start))
+        elapsed = max(1e-6, time.time() - start)
+        sps = int(global_step / elapsed)
         if writer:
             writer.add_scalar("charts/SPS", sps, global_step)
             writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)

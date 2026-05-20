@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-gym-tower-defense"
-version = "0.1.0"
+version = "0.2.0"
 description = "A tower defense game with a Gymnasium API for training AI agents (RL, heuristic, and tournament play)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -32,8 +32,9 @@ dependencies = [
 [project.optional-dependencies]
 rl = ["torch>=2.0", "tensorboard>=2.13"]
 viewer = ["pygame>=2.5"]
+llm = ["openai>=1.0", "anthropic>=0.18", "google-generativeai>=0.3"]
 dev = ["pytest>=7", "ruff>=0.3"]
-all = ["ai-gym-tower-defense[rl,viewer,dev]"]
+all = ["ai-gym-tower-defense[rl,viewer,llm,dev]"]
 
 [project.urls]
 Homepage = "https://github.com/USER/ai-gym-tower-defense"
@@ -44,6 +45,7 @@ Issues = "https://github.com/USER/ai-gym-tower-defense/issues"
 ai-td-train = "ai_gym_td.scripts.train:main"
 ai-td-eval = "ai_gym_td.scripts.evaluate:main"
 ai-td-play = "ai_gym_td.scripts.play:main"
+ai-td-benchmark = "scripts.benchmark:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

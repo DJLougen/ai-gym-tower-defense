@@ -35,6 +35,8 @@ This package gives you a **small, fast, pure-Python engine** plus a **Gymnasium 
 - 🖼️ **Headless PIL renderer** for GIF / MP4 export — great for notebooks and CI.
 - 🎨 **Optional pygame viewer** for live play.
 - 🔁 **Registered as `TowerDefense-v0`** via `gymnasium.make`.
+- 🤖 **LLM agent support** — benchmark OpenAI, Anthropic, and Google models with structured observations.
+- 📊 **Benchmark harness** — automated evaluation with win rates, costs, and latency tracking.
 
 ## Installation
 
@@ -144,6 +146,134 @@ python -m ai_gym_td.scripts.play
 
 Keys `1..4` select tower type, click a grass tile to build, `SPACE` skips the build phase, `ESC` quits.
 
+## LLM Agents & Benchmarking
+
+Benchmark frontier LLMs on strategic tower defense decisions. The framework converts game state into structured text observations and evaluates models on win rate, resource efficiency, and cost.
+
+### Supported Models
+
+| Provider | Models | API Key |
+|----------|--------|---------|
+| **OpenAI** | `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini` | `OPENAI_API_KEY` |
+| **Anthropic** | `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` | `ANTHROPIC_API_KEY` |
+| **Google** | `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
+
+### Installation
+
+```bash
+# Install LLM provider SDKs
+pip install -e ".[llm]"
+
+# Or install all dependencies
+pip install -e ".[all]"
+```
+
+### Quick Start
+
+```python
+from ai_gym_td.env import TowerDefenseEnv
+from ai_gym_td.llm_agents import OpenAIAgent
+
+env = TowerDefenseEnv()
+agent = OpenAIAgent(model="gpt-4o", env=env)
+
+obs, info = env.reset(seed=42)
+for step in range(1000):
+    action = agent.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        break
+
+print(f"Survived {info['wave']} waves")
+print(f"Agent stats: {agent.get_stats()}")
+```
+
+### Running the Benchmark Harness
+
+The benchmark script runs multiple episodes per model and collects:
+- **Win rate** — percentage of games won (all 20 waves cleared)
+- **Avg waves survived** — how far the agent got
+- **Avg final lives** — remaining base health
+- **Avg final gold** — resource efficiency
+- **Avg latency** — API response time per decision
+- **Total cost** — USD spent on API calls
+
+```bash
+# Set API keys
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="AI..."
+
+# Run benchmark on baselines (no API key needed)
+python scripts/benchmark.py --models greedy random --episodes 5
+
+# Benchmark frontier models
+python scripts/benchmark.py \
+    --models gpt-4o claude-3-5-sonnet-20241022 gemini-1.5-pro \
+    --episodes 10 \
+    --max-steps 4000
+
+# Results saved to benchmark_results/benchmark_YYYYMMDD_HHMMSS.json
+```
+
+### Example Output
+
+```
+================================================================================
+BENCHMARK LEADERBOARD
+================================================================================
+
+Model                  Win%   Waves   Lives    Gold   Latency     Cost
+--------------------------------------------------------------------------------
+claude-3-5-sonnet      80.0%    18.2     12.4     145     1.23s $ 0.2847
+gpt-4o                 70.0%    17.5     10.8     132     1.45s $ 0.3156
+gemini-1.5-pro         60.0%    16.8      9.2     128     0.89s $ 0.1423
+greedy                 40.0%    14.3      7.1      98     0.00s $ 0.0000
+random                  0.0%     8.2      0.0      42     0.00s $ 0.0000
+
+================================================================================
+```
+
+### Custom Observations
+
+The `format_obs_for_llm()` function converts the gymnasium observation dict into structured text:
+
+```python
+from ai_gym_td.obs_format import format_obs_for_llm
+
+obs, info = env.reset()
+text = format_obs_for_llm(env, obs, info)
+print(text)
+```
+
+This includes:
+- **Game State** — gold, lives, wave, phase
+- **Grid Map** — ASCII visualization with towers (A/C/I/Z), enemies (E), and terrain
+- **Towers** — positions and stats of built towers
+- **Enemies** — positions, HP, and speed
+- **Legal Actions** — affordable towers and recommended positions
+
+### Adding Your Own Agent
+
+Implement the `Agent` protocol:
+
+```python
+from ai_gym_td.agents import Agent
+import numpy as np
+
+class MyAgent(Agent):
+    def act(self, obs, info) -> np.ndarray:
+        # obs["grid"]: (H, W, 8) spatial features
+        # obs["global"]: (6,) global state
+        # obs["action_mask"]: (5, H, W) legal actions
+
+        # Return [tower_type, y, x] where tower_type=0 is pass
+        return np.array([1, 5, 10], dtype=np.int64)
+```
+
+See `ai_gym_td/llm_agents.py` for OpenAI/Anthropic/Google implementations.
+
+
 ## Project layout
 
 ```
@@ -158,14 +288,19 @@ ai-gym-tower-defense/
 │   ├── viewer.py          # optional pygame viewer
 │   ├── agents.py          # random / greedy / rule-based baselines
 │   ├── ppo.py             # CleanRL-style PPO
+│   ├── llm_agents.py      # OpenAI/Anthropic/Google LLM agents
+│   ├── obs_format.py      # structured observation formatting for LLMs
 │   ├── gym_register.py    # TowerDefense-v0 registration
 │   └── scripts/
 │       ├── train.py       # CLI: train PPO
 │       ├── evaluate.py    # CLI: eval + GIF
 │       └── play.py        # CLI: manual pygame play
+├── scripts/
+│   └── benchmark.py       # CLI: LLM benchmark harness
 ├── examples/
 │   ├── quickstart.py
 │   └── tournament.py
+├── benchmark_results/     # JSON benchmark outputs
 ├── tests/                 # pytest smoke tests
 ├── pyproject.toml
 ├── README.md
