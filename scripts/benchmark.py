@@ -24,7 +24,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai_gym_td.env import TowerDefenseEnv
-from ai_gym_td.llm_agents import OpenAIAgent, AnthropicAgent, GoogleAgent
+from ai_gym_td.llm_agents import OpenAIAgent, AnthropicAgent, GoogleAgent, OllamaAgent
 from ai_gym_td.agents import GreedyAgent, RandomAgent
 
 
@@ -45,6 +45,16 @@ MODEL_CONFIGS = {
     "gemini-1.5-pro": {"class": GoogleAgent, "provider": "google", "temperature": 0.7},
     "gemini-1.5-flash": {"class": GoogleAgent, "provider": "google", "temperature": 0.7},
     "gemini-2.0-flash": {"class": GoogleAgent, "provider": "google", "temperature": 0.7},
+
+    # Ollama local/cloud models (OpenAI-compatible API)
+    "qwen3-coder-next:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "minimax-m2.7:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "glm-5.1:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "qwen3.5:397b-cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "gemma4:31b-cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "deepseek-v4-pro:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "deepseek-v4-flash:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
+    "kimi-k2.6:cloud": {"class": OllamaAgent, "provider": "ollama", "temperature": 0.7},
     
     # Baselines (no API needed)
     "greedy": {"class": GreedyAgent, "provider": "baseline", "temperature": None},

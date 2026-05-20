@@ -12,6 +12,7 @@ try:
         OpenAIAgent,
         AnthropicAgent,
         GoogleAgent,
+        OllamaAgent,
         create_llm_agent,
     )
     from ai_gym_td.obs_format import format_obs_for_llm
@@ -22,6 +23,6 @@ except ImportError:
 __version__ = "0.2.0"
 __all__ = [
     "GameConfig", "TowerSpec", "EnemySpec", "TowerDefenseGame", "TowerDefenseEnv",
-    "LLMAgent", "OpenAIAgent", "AnthropicAgent", "GoogleAgent", 
+    "LLMAgent", "OpenAIAgent", "AnthropicAgent", "GoogleAgent", "OllamaAgent",
     "create_llm_agent", "format_obs_for_llm", "LLM_AVAILABLE"
 ]

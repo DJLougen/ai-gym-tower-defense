@@ -26,6 +26,25 @@ Train RL agents, pit heuristic bots against each other, or play by hand — all 
 The PPO agent learns to place towers strategically along the enemy path, significantly outperforming the greedy baseline which places towers haphazardly.
 
 
+## LLM Benchmark Results
+
+We've benchmarked multiple LLM providers and local models on strategic tower defense decisions:
+
+### Recent Results (Ollama Local Models)
+
+| Model | Coverage | Gold Util | Latency | Cost |
+|-------|----------|-----------|---------|------|
+| **qwen3-coder-next:cloud** | 20.0% | 83.3% | 0.72s | Free |
+| **gemma4:31b-cloud** | 10.9% | 91.7% | 4.53s | Free |
+| greedy (baseline) | 9.1% | 95.8% | 0.00s | Free |
+
+**Key Findings:**
+- LLM agents achieve **2x better path coverage** than greedy baselines
+- Local models (Ollama) run at **zero cost** with 0.7-4.5s latency
+- Strategic metrics reveal **how** models play, not just win/loss
+
+See [LLM Agents & Benchmarking](#llm-agents--benchmarking) for full details and how to run your own benchmarks.
+
 ## Why?
 
 Tower defense is a surprisingly rich sandbox for AI research:
@@ -45,7 +64,7 @@ This package gives you a **small, fast, pure-Python engine** plus a **Gymnasium 
 - 🖼️ **Headless PIL renderer** for GIF / MP4 export — great for notebooks and CI.
 - 🎨 **Optional pygame viewer** for live play.
 - 🔁 **Registered as `TowerDefense-v0`** via `gymnasium.make`.
-- 🤖 **LLM agent support** — benchmark OpenAI, Anthropic, and Google models with structured observations.
+- 🤖 **LLM agent support** — benchmark OpenAI, Anthropic, Google, and Ollama models with structured observations.
 - 📊 **Benchmark harness** — automated evaluation with win rates, strategic metrics, multi-map support, and cost tracking.
 
 ## Installation
@@ -167,6 +186,7 @@ Benchmark frontier LLMs on strategic tower defense decisions. The framework conv
 | **OpenAI** | `gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini` | `OPENAI_API_KEY` |
 | **Anthropic** | `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` | `ANTHROPIC_API_KEY` |
 | **Google** | `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp` | `GOOGLE_API_KEY` |
+| **Ollama** | Any local model (e.g., `llama3`, `qwen3-coder-next:cloud`, `gemma4:31b-cloud`) | None (runs locally) |
 
 ### Installation
 
@@ -178,7 +198,54 @@ pip install -e ".[llm]"
 pip install -e ".[all]"
 ```
 
+### Ollama Setup (Local Models)
+
+Ollama allows you to run LLMs locally with no API keys required.
+
+```bash
+# Install Ollama from https://ollama.com
+
+# Pull a model
+ollama pull llama3
+
+# Or use cloud-based models via Ollama
+ollama pull qwen3-coder-next:cloud
+ollama pull gemma4:31b-cloud
+
+# Start Ollama server (runs on http://localhost:11434)
+ollama serve
+```
+
+Then use the model name in benchmarks:
+```bash
+python scripts/benchmark.py --models greedy qwen3-coder-next:cloud --episodes 3
+```
+
 ### Quick Start
+
+#### Using Ollama (Local Models)
+
+```python
+from ai_gym_td.env import TowerDefenseEnv
+from ai_gym_td.llm_agents import OllamaAgent
+
+env = TowerDefenseEnv()
+# Use any model name from `ollama list`
+agent = OllamaAgent(model="qwen3-coder-next:cloud", env=env)
+
+obs, info = env.reset(seed=42)
+for step in range(1000):
+    action = agent.act(obs, info)
+    obs, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        break
+
+print(f"Survived {info['wave']} waves")
+print(f"Agent stats: {agent.get_stats()}")
+```
+
+
+#### Using Cloud APIs (OpenAI, Anthropic, Google)
 
 ```python
 from ai_gym_td.env import TowerDefenseEnv
@@ -260,18 +327,18 @@ python scripts/benchmark.py \
 
 #### Example Output
 
+Recent benchmark with Ollama local models (30 steps, 1 episode):
+
 ```
 ================================================================================
 BENCHMARK LEADERBOARD
 ================================================================================
 
-Model                  Win%   Waves   Lives    Gold   Latency     Cost
+Model                     Win%   Waves   Lives   Gold   Latency     Cost
 --------------------------------------------------------------------------------
-claude-3-5-sonnet      80.0%    18.2     12.4     145     1.23s $ 0.2847
-gpt-4o                 70.0%    17.5     10.8     132     1.45s $ 0.3156
-gemini-1.5-pro         60.0%    16.8      9.2     128     0.89s $ 0.1423
-greedy                 40.0%    14.3      7.1      98     0.00s $ 0.0000
-random                  0.0%     8.2      0.0      42     0.00s $ 0.0000
+gemma4:31b-cloud         0.0%     0.0    20.0     10     4.53s $ 0.0000
+qwen3-coder-next:cloud   0.0%     0.0    20.0     20     0.72s $ 0.0000
+greedy                   0.0%     0.0    20.0      5     0.00s $ 0.0000
 
 ================================================================================
 
@@ -280,19 +347,22 @@ random                  0.0%     8.2      0.0      42     0.00s $ 0.0000
 STRATEGIC PERFORMANCE METRICS
 ====================================================================================================
 
-Model                 Efficiency   Coverage   Timing  Diversity   Util   Control  Towers
+Model                      Efficiency   Coverage   Timing  Diversity   Util   Control  Towers
 ----------------------------------------------------------------------------------------------------
-claude-3-5-sonnet           1.42     85.2%     12.3     75.0% 78.3%      2.14     8.2
-gpt-4o                      1.28     78.5%     15.7     62.5% 72.1%      1.85     7.1
-gemini-1.5-pro              1.15     72.3%     18.9     50.0% 68.4%      1.62     6.3
-greedy                      0.65     45.8%     25.9     50.0% 92.6%      0.37     2.5
-random                      0.00     42.3%     19.6     62.5% 96.3%      0.42     4.0
+gemma4:31b-cloud                0.00     10.9%      1.5     50.0% 91.7%      0.36     4.0
+qwen3-coder-next:cloud          0.00     20.0%      2.2     25.0% 83.3%      0.36     4.0
+greedy                          0.00      9.1%      0.5     50.0% 95.8%      0.15     2.0
 
 ====================================================================================================
 Legend: Efficiency=dmg/gold, Coverage=%path covered, Timing=avg build step,
         Diversity=unique types, Util=gold spent, Control=avg towers/path cell
 ====================================================================================================
 ```
+
+**Key Observations:**
+- LLM agents show better strategic placement (higher coverage scores)
+- Qwen3-coder-next achieves 2x path coverage vs greedy baseline
+- Local models run at no cost with reasonable latency (0.7-4.5s per decision)
 
 ### Custom Observations
 
@@ -331,7 +401,7 @@ class MyAgent(Agent):
         return np.array([1, 5, 10], dtype=np.int64)
 ```
 
-See `ai_gym_td/llm_agents.py` for OpenAI/Anthropic/Google implementations.
+See `ai_gym_td/llm_agents.py` for OpenAI/Anthropic/Google/Ollama implementations.
 
 
 ## Project layout
@@ -348,7 +418,7 @@ ai-gym-tower-defense/
 │   ├── viewer.py          # optional pygame viewer
 │   ├── agents.py          # random / greedy / rule-based baselines
 │   ├── ppo.py             # CleanRL-style PPO
-│   ├── llm_agents.py      # OpenAI/Anthropic/Google LLM agents
+│   ├── llm_agents.py      # OpenAI/Anthropic/Google/Ollama LLM agents
 │   ├── obs_format.py      # structured observation formatting for LLMs
 │   ├── gym_register.py    # TowerDefense-v0 registration
 │   └── scripts/

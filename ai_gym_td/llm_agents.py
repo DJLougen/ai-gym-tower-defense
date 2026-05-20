@@ -61,6 +61,8 @@ class LLMAgent(Agent):
         """Build default system prompt with game rules and action format."""
         parts = [
             "You are an expert tower defense strategist.",
+            "You MUST respond with ONLY valid JSON, no explanations or reasoning.",
+            "Do not include any text before or after the JSON object.",
             "",
             format_game_rules(),
             "",
@@ -343,6 +345,59 @@ class GoogleAgent(LLMAgent):
         return response.text
 
 
+class OllamaAgent(LLMAgent):
+    """Ollama agent for local/cloud models via OpenAI-compatible API."""
+
+    def __init__(self, model: str, base_url: str = "http://localhost:11434/v1", **kwargs):
+        super().__init__(model=model, provider="ollama", **kwargs)
+
+        try:
+            import openai
+        except ImportError:
+            raise ImportError("Ollama agent requires: pip install openai")
+
+        # Ollama uses OpenAI-compatible API
+        self.client = openai.OpenAI(
+            base_url=base_url,
+            api_key="ollama"  # Ollama doesn't need a real API key
+        )
+
+        # No pricing for local models (cost = $0)
+        self.pricing = {}
+
+    def _call_llm(self, prompt: str) -> str:
+        """Call Ollama API."""
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": prompt},
+        ]
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+
+        # Track tokens (Ollama provides usage stats)
+        if hasattr(response, 'usage') and response.usage:
+            input_tokens = response.usage.prompt_tokens
+            output_tokens = response.usage.completion_tokens
+            self.total_tokens += input_tokens + output_tokens
+
+        # No cost tracking for local models
+
+        # Get response content (some models use 'reasoning' field)
+        message = response.choices[0].message
+        content = message.content
+
+        # If content is empty, try reasoning field (used by some Ollama models)
+        if not content and hasattr(message, 'reasoning'):
+            content = message.reasoning
+
+        return content or ""
+
+
 def create_llm_agent(
     provider: str,
     model: str,
@@ -352,7 +407,7 @@ def create_llm_agent(
     """Factory function to create LLM agents.
     
     Args:
-        provider: "openai", "anthropic", or "google"
+        provider: "openai", "anthropic", "google", or "ollama"
         model: Model name (e.g., "gpt-4o", "claude-3-5-sonnet-20241022")
         api_key: API key (or use environment variables)
         **kwargs: Additional arguments passed to agent constructor
@@ -368,8 +423,11 @@ def create_llm_agent(
         return AnthropicAgent(model=model, api_key=api_key, **kwargs)
     elif provider == "google":
         return GoogleAgent(model=model, api_key=api_key, **kwargs)
+    elif provider == "ollama":
+        base_url = kwargs.pop("base_url", "http://localhost:11434/v1")
+        return OllamaAgent(model=model, base_url=base_url, **kwargs)
     else:
-        raise ValueError(f"Unknown provider: {provider}. Choose from: openai, anthropic, google")
+        raise ValueError(f"Unknown provider: {provider}. Choose from: openai, anthropic, google, ollama")
 
 
 __all__ = [
@@ -377,5 +435,6 @@ __all__ = [
     "OpenAIAgent",
     "AnthropicAgent",
     "GoogleAgent",
+    "OllamaAgent",
     "create_llm_agent",
 ]
