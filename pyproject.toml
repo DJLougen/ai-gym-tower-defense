@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-gym-tower-defense"
+version = "0.1.0"
+description = "A tower defense game with a Gymnasium API for training AI agents (RL, heuristic, and tournament play)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "AI Gym TD Contributors" }]
+keywords = ["reinforcement-learning", "tower-defense", "gymnasium", "gym", "ai", "game"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.23",
+    "gymnasium>=0.29",
+    "Pillow>=9.5",
+    "imageio>=2.31",
+]
+
+[project.optional-dependencies]
+rl = ["torch>=2.0", "tensorboard>=2.13"]
+viewer = ["pygame>=2.5"]
+dev = ["pytest>=7", "ruff>=0.3"]
+all = ["ai-gym-tower-defense[rl,viewer,dev]"]
+
+[project.urls]
+Homepage = "https://github.com/USER/ai-gym-tower-defense"
+Repository = "https://github.com/USER/ai-gym-tower-defense"
+Issues = "https://github.com/USER/ai-gym-tower-defense/issues"
+
+[project.scripts]
+ai-td-train = "ai_gym_td.scripts.train:main"
+ai-td-eval = "ai_gym_td.scripts.evaluate:main"
+ai-td-play = "ai_gym_td.scripts.play:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai_gym_td*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
