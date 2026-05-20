@@ -87,14 +87,18 @@ def create_agent(model_name: str, env: TowerDefenseEnv, verbose: bool = False):
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set")
-        
-        return agent_class(
+
+        kwargs = dict(
             model=model_name,
             env=env,
             api_key=api_key,
             temperature=config["temperature"],
             verbose=verbose,
         )
+        # Ollama models get a per-call timeout to prevent benchmark hangs
+        if config["provider"] == "ollama":
+            kwargs["timeout"] = 120.0
+        return agent_class(**kwargs)
 
 
 def compute_strategic_metrics(env: TowerDefenseEnv, episode_data: Dict) -> Dict:

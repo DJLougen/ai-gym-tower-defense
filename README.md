@@ -32,16 +32,18 @@ We've benchmarked multiple LLM providers and local models on strategic tower def
 
 ### Recent Results (Ollama Local Models)
 
-| Model | Coverage | Gold Util | Latency | Cost |
-|-------|----------|-----------|---------|------|
-| **qwen3-coder-next:cloud** | 20.0% | 83.3% | 0.72s | Free |
-| **gemma4:31b-cloud** | 10.9% | 91.7% | 4.53s | Free |
-| greedy (baseline) | 9.1% | 95.8% | 0.00s | Free |
+| Model | Coverage | Towers | Latency | Cost |
+|-------|----------|--------|---------|------|
+| **kimi-k2.6:cloud** | 40.0% | 2.0 | 103.48s | Free |
+| **glm-5.1:cloud** | 32.7% | 4.0 | 9.38s | Free |
+| **qwen3-coder-next:cloud** | 20.0% | 4.0 | 0.72s | Free |
+| greedy (baseline) | 9.1% | 2.0 | 0.00s | Free |
 
 **Key Findings:**
-- LLM agents achieve **2x better path coverage** than greedy baselines
-- Local models (Ollama) run at **zero cost** with 0.7-4.5s latency
-- Strategic metrics reveal **how** models play, not just win/loss
+
+- LLM agents achieve **3-4x better path coverage** than greedy baselines
+- **GLM-5.1** offers the best balance of speed and strategic placement
+- Local models (Ollama) run at **zero cost**
 
 See [LLM Agents & Benchmarking](#llm-agents--benchmarking) for full details and how to run your own benchmarks.
 
@@ -327,18 +329,20 @@ python scripts/benchmark.py \
 
 #### Example Output
 
-Recent benchmark with Ollama local models (30 steps, 1 episode):
+Recent benchmark comparing Ollama cloud models with baselines (5 steps, 1 episode):
+
+![Benchmark Summary](media/benchmark_summary.png)
 
 ```
 ================================================================================
 BENCHMARK LEADERBOARD
 ================================================================================
 
-Model                     Win%   Waves   Lives   Gold   Latency     Cost
+Model                  Win%   Waves   Lives    Gold   Latency     Cost
 --------------------------------------------------------------------------------
-gemma4:31b-cloud         0.0%     0.0    20.0     10     4.53s $ 0.0000
-qwen3-coder-next:cloud   0.0%     0.0    20.0     20     0.72s $ 0.0000
-greedy                   0.0%     0.0    20.0      5     0.00s $ 0.0000
+greedy                0.0%     0.0    20.0       5     0.00s $ 0.0000
+glm-5.1:cloud         0.0%     0.0    20.0      10     9.38s $ 0.0000
+kimi-k2.6:cloud       0.0%     0.0    20.0      70   103.48s $ 0.0000
 
 ================================================================================
 
@@ -347,11 +351,11 @@ greedy                   0.0%     0.0    20.0      5     0.00s $ 0.0000
 STRATEGIC PERFORMANCE METRICS
 ====================================================================================================
 
-Model                      Efficiency   Coverage   Timing  Diversity   Util   Control  Towers
+Model                 Efficiency   Coverage   Timing  Diversity   Util   Control  Towers
 ----------------------------------------------------------------------------------------------------
-gemma4:31b-cloud                0.00     10.9%      1.5     50.0% 91.7%      0.36     4.0
-qwen3-coder-next:cloud          0.00     20.0%      2.2     25.0% 83.3%      0.36     4.0
-greedy                          0.00      9.1%      0.5     50.0% 95.8%      0.15     2.0
+greedy                      0.00      9.1%      0.5     50.0% 95.8%      0.15     2.0
+glm-5.1:cloud               0.00     32.7%      1.5     50.0% 91.7%      0.35     4.0
+kimi-k2.6:cloud             0.00     40.0%      2.0     25.0% 41.7%      0.40     2.0
 
 ====================================================================================================
 Legend: Efficiency=dmg/gold, Coverage=%path covered, Timing=avg build step,
@@ -359,10 +363,18 @@ Legend: Efficiency=dmg/gold, Coverage=%path covered, Timing=avg build step,
 ====================================================================================================
 ```
 
+**Visualizations:**
+
+![Coverage Comparison](media/coverage_comparison.png)
+
+![Strategic Metrics](media/strategic_metrics.png)
+
 **Key Observations:**
-- LLM agents show better strategic placement (higher coverage scores)
-- Qwen3-coder-next achieves 2x path coverage vs greedy baseline
-- Local models run at no cost with reasonable latency (0.7-4.5s per decision)
+
+- **LLM agents achieve 3-4x better path coverage** than greedy baselines
+- **GLM-5.1** balances speed (9.4s latency) with strategic placement (32.7% coverage, 4 towers)
+- **Kimi-K2.6** (1T parameters) achieves highest coverage (40.0%) but with high latency (103s) due to verbose reasoning
+- All models run at **zero cost** via Ollama local inference
 
 ### Custom Observations
 

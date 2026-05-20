@@ -145,31 +145,75 @@ class LLMAgent(Agent):
                 print(f"Warning: Invalid JSON: {json_str}. Passing.")
             return np.array([0, 0, 0], dtype=np.int64)
         
-        # Parse action
+        # Parse action — handle format variations from different LLM providers
+        # Models may output: "tower_type", "tower", or "type" for the tower name
+        tower_name = (
+            data.get("tower_type", "")
+            or data.get("tower", "")
+            or data.get("type", "")
+        ).lower()
+
+        # Handle array formats: {"actions": [...]} or {"build": [...]}
+        for key in ("actions", "build"):
+            if key in data and isinstance(data[key], list):
+                for item in data[key]:
+                    if isinstance(item, dict):
+                        item_action = item.get("action", "build")
+                        if item_action == "build" or key == "build":
+                            tn = (item.get("tower_type", "") or item.get("tower", "") or item.get("type", "")).lower()
+                            x, y = self._get_xy(item)
+                            return self._build_action(tn, x, y)
+                return np.array([0, 0, 0], dtype=np.int64)
+
         action = data.get("action", "pass")
         if action == "pass":
             return np.array([0, 0, 0], dtype=np.int64)
-        
+
         if action == "build":
-            tower_name = data.get("tower_type", "").lower()
-            x = data.get("x", 0)
-            y = data.get("y", 0)
-            
-            # Map tower name to index
-            tower_names = {"archer": 1, "cannon": 2, "ice": 3, "tesla": 4}
-            tower_idx = tower_names.get(tower_name, 0)
-            
-            if tower_idx == 0:
-                if self.verbose:
-                    print(f"Warning: Unknown tower type '{tower_name}'. Passing.")
-                return np.array([0, 0, 0], dtype=np.int64)
-            
-            return np.array([tower_idx, int(y), int(x)], dtype=np.int64)
-        
+            x, y = self._get_xy(data)
+            return self._build_action(tower_name, x, y)
+
         if self.verbose:
             print(f"Warning: Unknown action '{action}'. Passing.")
         return np.array([0, 0, 0], dtype=np.int64)
-    
+
+    def _get_xy(self, data: Dict[str, Any]) -> tuple:
+        """Extract x, y coordinates from a dict.
+
+        Handles multiple formats:
+        - {"x": 5, "y": 3}
+        - {"position": [y, x]} or [x, y]
+        - {"pos": [y, x]}
+        - {"coords": [x, y]}
+        """
+        x = data.get("x", 0)
+        y = data.get("y", 0)
+
+        # Check for position/pos/coords array format
+        for key in ("position", "pos", "coords", "location", "loc"):
+            if key in data and isinstance(data[key], (list, tuple)) and len(data[key]) >= 2:
+                # Most common convention: [y, x] (row, col) or [x, y]
+                # We default to [y, x] which matches (row, col) convention
+                y, x = int(data[key][0]), int(data[key][1])
+                break
+
+        return int(x), int(y)
+
+    def _build_action(self, tower_name: str, x: int, y: int) -> np.ndarray:
+        """Convert tower name and coordinates to action array.
+
+        Returns [tower_idx, y, x] where tower_idx=0 if unknown tower type.
+        """
+        tower_names = {"archer": 1, "cannon": 2, "ice": 3, "tesla": 4}
+        tower_idx = tower_names.get(tower_name.lower() if tower_name else "", 0)
+
+        if tower_idx == 0:
+            if self.verbose:
+                print(f"Warning: Unknown tower type '{tower_name}'. Passing.")
+            return np.array([0, 0, 0], dtype=np.int64)
+
+        return np.array([tower_idx, int(y), int(x)], dtype=np.int64)
+
     def _extract_json(self, text: str) -> Optional[str]:
         """Extract JSON object from text (handles markdown code blocks)."""
         # Try to find JSON in code blocks
@@ -344,12 +388,23 @@ class GoogleAgent(LLMAgent):
         
         return response.text
 
-
 class OllamaAgent(LLMAgent):
     """Ollama agent for local/cloud models via OpenAI-compatible API."""
 
-    def __init__(self, model: str, base_url: str = "http://localhost:11434/v1", **kwargs):
+    # Reasoning models need higher token budgets (reasoning + content share the limit)
+    REASONING_MODELS = {"glm", "kimi", "deepseek", "qwen3", "minimax", "qwen3.5"}
+
+    def __init__(self, model: str, base_url: str = "http://localhost:11434/v1",
+                 timeout: float = 120.0, **kwargs):
+        # Default to higher max_tokens for reasoning-heavy Ollama models
+        if "max_tokens" not in kwargs:
+            model_lower = model.lower()
+            if any(prefix in model_lower for prefix in self.REASONING_MODELS):
+                kwargs["max_tokens"] = 8192
+            else:
+                kwargs["max_tokens"] = 1024
         super().__init__(model=model, provider="ollama", **kwargs)
+        self.timeout = timeout
 
         try:
             import openai
@@ -359,7 +414,8 @@ class OllamaAgent(LLMAgent):
         # Ollama uses OpenAI-compatible API
         self.client = openai.OpenAI(
             base_url=base_url,
-            api_key="ollama"  # Ollama doesn't need a real API key
+            api_key="ollama",  # Ollama doesn't need a real API key
+            timeout=timeout,
         )
 
         # No pricing for local models (cost = $0)
@@ -372,12 +428,17 @@ class OllamaAgent(LLMAgent):
             {"role": "user", "content": prompt},
         ]
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Ollama API call failed: {e}. Passing.")
+            return ""
 
         # Track tokens (Ollama provides usage stats)
         if hasattr(response, 'usage') and response.usage:
@@ -389,14 +450,14 @@ class OllamaAgent(LLMAgent):
 
         # Get response content (some models use 'reasoning' field)
         message = response.choices[0].message
-        content = message.content
+        content = message.content or ""
 
-        # If content is empty, try reasoning field (used by some Ollama models)
-        if not content and hasattr(message, 'reasoning'):
-            content = message.reasoning
+        # If content is empty, use reasoning field (reasoning models spend tokens on
+        # chain-of-thought and may only produce JSON inside reasoning)
+        if not content and hasattr(message, 'reasoning') and message.reasoning:
+            return message.reasoning
 
-        return content or ""
-
+        return content
 
 def create_llm_agent(
     provider: str,
